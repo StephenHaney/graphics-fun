@@ -15,12 +15,12 @@
 
   function init() {
     // Generate agents
-    for (let i = 0; i < 2500; i++) {
+    for (let i = 0; i < 5000; i++) {
       agents.push({
         x: getRandomInt(0.1, canvas.clientWidth),
         y: getRandomInt(0.1, canvas.clientHeight),
         rotation: getRandomInt(0, Math.PI * 2),
-        radius: 20,
+        radius: 2,
       });
     }
   }
@@ -28,7 +28,7 @@
   function draw() {
     const imgData = ctx.getImageData(0, 0, canvas.clientWidth, canvas.clientHeight);
 
-    ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    // ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
     ctx.fillStyle = 'rgba(120, 145, 200, 0.5)';
 
     for (const agent of agents) {
