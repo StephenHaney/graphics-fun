@@ -1,0 +1,13 @@
+{
+  "name": "webgl-fun",
+  "version": "0.0.1",
+  "type": "module",
+  "author": "Stephen Haney",
+  "description": "Getting hands on with WebGL",
+  "scripts": {
+    "start": "cd src && live-server --no-css-inject"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.1"
+  }
+}
