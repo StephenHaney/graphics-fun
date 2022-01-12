@@ -15,7 +15,7 @@
 
   function init() {
     // Generate agents
-    for (let i = 0; i < 100; i++) {
+    for (let i = 0; i < 2500; i++) {
       agents.push({
         x: getRandomInt(0.1, canvas.clientWidth),
         y: getRandomInt(0.1, canvas.clientHeight),
@@ -29,8 +29,8 @@
     const imgData = ctx.getImageData(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+    ctx.fillStyle = 'rgba(120, 145, 200, 0.5)';
 
-    ctx.fillStyle = '#222255';
     for (const agent of agents) {
       // console.log(getPixelFromPoint(imgData, agent.x + 20, agent.y + 20));
 
@@ -67,12 +67,12 @@
 
         if (leftSample.a !== 0) {
           // Turn left!
-          agent.rotation -= 1;
+          agent.rotation -= 0.6;
           dx = leftDx;
           dy = leftDy;
         } else if (rightSample.a !== 0) {
           // Turn right!
-          agent.rotation += 1;
+          agent.rotation += 0.6;
           dx = rightDx;
           dy = rightDy;
         }
@@ -83,21 +83,25 @@
       agent.y += dy;
 
       // Flip X if it hits bounds
-      if (agent.x - agent.radius < 0) {
+      if (agent.x - agent.radius <= 0) {
         agent.x = agent.radius;
-        agent.rotation += Math.PI;
-      } else if (agent.x + agent.radius > canvas.clientWidth) {
+        // Flip the dx and calculate it in radians
+        agent.rotation = Math.atan2(dy, -dx);
+      } else if (agent.x + agent.radius >= canvas.clientWidth) {
         agent.x = canvas.clientWidth - agent.radius;
-        agent.rotation += Math.PI;
+        // Flip the dx and calculate it in radians
+        agent.rotation = Math.atan2(dy, -dx);
       }
 
       // Flip Y if it hits bounds
-      if (agent.y - agent.radius < 0) {
+      if (agent.y - agent.radius <= 0) {
         agent.y = agent.radius;
-        agent.rotation += Math.PI;
-      } else if (agent.y + agent.radius > canvas.clientHeight) {
+        // Flip the dy and calculate it in radians
+        agent.rotation = Math.atan2(-dy, dx);
+      } else if (agent.y + agent.radius >= canvas.clientHeight) {
         agent.y = canvas.clientHeight - agent.radius;
-        agent.rotation += Math.PI;
+        // Flip the dy and calculate it in radians
+        agent.rotation = Math.atan2(-dy, dx);
       }
     }
     ctx.fill();
