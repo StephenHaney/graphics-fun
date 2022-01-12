@@ -21,10 +21,11 @@
         y: getRandomInt(0.1, canvas.clientHeight),
         rotation: getRandomInt(0, Math.PI * 2),
         radius: 1,
-        color: `rgba(${getRandomInt(100, 225)}, ${getRandomInt(100, 225)}, ${getRandomInt(
+        color: `rgba(${getRandomInt(100, 240)}, ${getRandomInt(100, 240)}, ${getRandomInt(
           100,
-          225
+          240
         )}, 0.5)`,
+        headStrong: 0,
       });
     }
   }
@@ -45,39 +46,50 @@
       let dx = Math.cos(agent.rotation);
       let dy = Math.sin(agent.rotation);
 
-      // Sample ahead for steering
-      const centerSample = getPixelFromPoint(
-        imgData,
-        agent.x + dx * 50,
-        agent.y + dy * 50
-      );
-      if (centerSample.a === 0) {
-        // Center is negative, check the sides
-        const leftDx = Math.cos(agent.rotation - 1);
-        const leftDy = Math.sin(agent.rotation - 1);
-        const leftSample = getPixelFromPoint(
+      if (agent.headStrong > 0) {
+        // If it's currently headstrong it's blazing its own path, just decrease its headstrong count
+        agent.headStrong -= 1;
+      } else if (getRandomInt(1, 1000) === 1000) {
+        // 1 time out of 1000 pick a random new direction to go and go HEADSTRONG
+        let newDirection = Math.random(0, 2 * Math.PI, false);
+        dx = Math.cos(newDirection);
+        dy = Math.sin(newDirection);
+        agent.headStrong = 50;
+      } else {
+        // Sample ahead for steering
+        const centerSample = getPixelFromPoint(
           imgData,
-          agent.x + leftDx * 50,
-          agent.y + leftDy * 50
+          agent.x + dx * 50,
+          agent.y + dy * 50
         );
-        const rightDx = Math.cos(agent.rotation + 1);
-        const rightDy = Math.sin(agent.rotation + 1);
-        const rightSample = getPixelFromPoint(
-          imgData,
-          agent.x + rightDx * 50,
-          agent.y + rightDy * 50
-        );
+        if (centerSample.a === 0) {
+          // Center is negative, check the sides
+          const leftDx = Math.cos(agent.rotation - 1);
+          const leftDy = Math.sin(agent.rotation - 1);
+          const leftSample = getPixelFromPoint(
+            imgData,
+            agent.x + leftDx * 50,
+            agent.y + leftDy * 50
+          );
+          const rightDx = Math.cos(agent.rotation + 1);
+          const rightDy = Math.sin(agent.rotation + 1);
+          const rightSample = getPixelFromPoint(
+            imgData,
+            agent.x + rightDx * 50,
+            agent.y + rightDy * 50
+          );
 
-        if (leftSample.a !== 0) {
-          // Turn left!
-          agent.rotation -= 0.6;
-          dx = leftDx;
-          dy = leftDy;
-        } else if (rightSample.a !== 0) {
-          // Turn right!
-          agent.rotation += 0.6;
-          dx = rightDx;
-          dy = rightDy;
+          if (leftSample.a !== 0) {
+            // Turn left!
+            agent.rotation -= 0.6;
+            dx = leftDx;
+            dy = leftDy;
+          } else if (rightSample.a !== 0) {
+            // Turn right!
+            agent.rotation += 0.6;
+            dx = rightDx;
+            dy = rightDy;
+          }
         }
       }
 
