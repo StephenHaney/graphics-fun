@@ -20,7 +20,11 @@
         x: getRandomInt(0.1, canvas.clientWidth),
         y: getRandomInt(0.1, canvas.clientHeight),
         rotation: getRandomInt(0, Math.PI * 2),
-        radius: 2,
+        radius: 1,
+        color: `rgba(${getRandomInt(100, 225)}, ${getRandomInt(100, 225)}, ${getRandomInt(
+          100,
+          225
+        )}, 0.5)`,
       });
     }
   }
@@ -29,10 +33,9 @@
     const imgData = ctx.getImageData(0, 0, canvas.clientWidth, canvas.clientHeight);
 
     // ctx.clearRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-    ctx.fillStyle = 'rgba(120, 145, 200, 0.5)';
 
     for (const agent of agents) {
-      // console.log(getPixelFromPoint(imgData, agent.x + 20, agent.y + 20));
+      ctx.fillStyle = agent.color;
 
       // Draw the agent
       ctx.beginPath();
