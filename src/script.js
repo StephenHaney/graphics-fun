@@ -24,8 +24,8 @@ void main() {
 
 (() => {
   const canvas = document.getElementById('rendering-canvas');
-  // const gl = canvas.getContext('webgl');
-  const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
+  const gl = canvas.getContext('webgl');
+  // const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
   const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
 
   /** State */
@@ -51,7 +51,7 @@ void main() {
   const agents = [];
   function initAgents() {
     // Generate agents
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 20000; i++) {
       agents.push({
         x: getRandomNumber(0, canvas.clientWidth),
         y: getRandomNumber(0, canvas.clientHeight),
