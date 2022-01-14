@@ -1,24 +1,62 @@
-const agentSize = 2;
+const agentSize = 1;
 const halfSize = Math.max(1, agentSize / 2);
 
-const vs = `
+const vsAgents = `
 attribute vec4 position;
-// attribute vec4 a_Color;
-// varying vec4 v_Color;
 
 void main() {
   gl_Position = position;
   gl_PointSize = ${agentSize}.0;
-  // v_Color = a_Color;
 }
 `;
 
-const fs = `
+const fsAgents = `
 precision mediump float;
-// varying vec4 v_Color;
 
 void main() {
   gl_FragColor = vec4(0.2, 0.6, 0.8, 1.0);
+}
+`;
+
+/** Spits out positions and matching texture coordinates for a provided rectangle area */
+const vsQuad = `
+attribute vec4 position;
+attribute vec2 texcoord;
+
+varying vec2 v_texcoord;
+
+void main() {
+  gl_Position = position;
+  v_texcoord = texcoord;
+}
+`;
+
+/** Mixes down between a pixel's color from the texture and a uniform color */
+const fsFade = `
+precision mediump float;
+
+varying vec2 v_texcoord;
+
+uniform sampler2D u_texture;
+uniform float u_mixAmount;
+uniform vec4 u_fadeColor;
+
+void main() {
+  vec4 color = texture2D(u_texture, v_texcoord);
+  gl_FragColor = mix(color, u_fadeColor, u_mixAmount);
+}
+`;
+
+/** Prints a texture out exactly */
+const fsCopy = `
+precision mediump float;
+
+varying vec2 v_texcoord;
+
+uniform sampler2D u_texture;
+
+void main() {
+  gl_FragColor = texture2D(u_texture, v_texcoord);
 }
 `;
 
@@ -26,12 +64,17 @@ void main() {
   const canvas = document.getElementById('rendering-canvas');
   const gl = canvas.getContext('webgl');
   // const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
-  const programInfo = twgl.createProgramInfo(gl, [vs, fs]);
+  const agentProgramInfo = twgl.createProgramInfo(gl, [vsAgents, fsAgents]);
+  const fadeProgramInfo = twgl.createProgramInfo(gl, [vsQuad, fsFade]);
+  const copyProgramInfo = twgl.createProgramInfo(gl, [vsQuad, fsCopy]);
 
   /** State */
   const state = {
     playing: true,
   };
+
+  /** An array the size of the full canvas buffer to store our pixel data */
+  let pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
 
   // Keep the canvas full screen at all times
   function makeCanvasFullScreen() {
@@ -40,7 +83,14 @@ void main() {
     );
     canvas.height = window.innerHeight;
     canvas.width = window.innerWidth - controlsWidth;
-    gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
+
+    if (twgl.resizeCanvasToDisplaySize(gl.canvas)) {
+      twgl.resizeFramebufferInfo(gl, fadeFrameBuffer1, fadeAttachments);
+      twgl.resizeFramebufferInfo(gl, fadeFrameBuffer2, fadeAttachments);
+    }
+
+    // Create a new pixel buffer with our new size
+    pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
   }
   // Resize listener:
   window.addEventListener('resize', makeCanvasFullScreen);
@@ -51,7 +101,7 @@ void main() {
   const agents = [];
   function initAgents() {
     // Generate agents
-    for (let i = 0; i < 20000; i++) {
+    for (let i = 0; i < 25000; i++) {
       agents.push({
         x: getRandomNumber(0, canvas.clientWidth),
         y: getRandomNumber(0, canvas.clientHeight),
@@ -61,8 +111,22 @@ void main() {
     }
   }
 
-  let bufferInfo = null;
-  const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+  /** Stores the positions of all the dots */
+  let agentBufferInfo = null;
+  /** -1 to 1 quad buffer */
+  const quadBufferInfo = twgl.primitives.createXYQuadBufferInfo(gl);
+  console.log(quadBufferInfo);
+
+  // Creates an RGBA/UNSIGNED_BYTE texture and depth buffer framebuffer
+  const imgFbi = twgl.createFramebufferInfo(gl);
+
+  // Creates 2 RGBA texture + depth framebuffers
+  var fadeAttachments = [
+    { format: gl.RGBA, min: gl.NEAREST, max: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE },
+    { format: gl.DEPTH_STENCIL },
+  ];
+  var fadeFrameBuffer1 = twgl.createFramebufferInfo(gl, fadeAttachments);
+  var fadeFrameBuffer2 = twgl.createFramebufferInfo(gl, fadeAttachments);
 
   function draw(time) {
     requestAnimationFrame(draw);
@@ -153,20 +217,42 @@ void main() {
       vertices.push(xToClip, yToClip, 1);
     }
 
+    // Fade by copying from frameBuffer1 to with a fade frameBuffer2
+    twgl.bindFramebufferInfo(gl, fadeFrameBuffer2);
+    gl.useProgram(fadeProgramInfo.program);
+    twgl.setBuffersAndAttributes(gl, fadeProgramInfo, quadBufferInfo);
+    twgl.setUniforms(fadeProgramInfo, {
+      u_texture: fadeFrameBuffer1.attachments[0],
+      u_mixAmount: 0.05,
+      u_fadeColor: [0, 0, 0, 0],
+    });
+    twgl.drawBufferInfo(gl, quadBufferInfo, gl.TRIANGLES);
+
+    /** Draw new things to FB2 */
+    // Target is FB2
+    twgl.bindFramebufferInfo(gl, fadeFrameBuffer2);
     // Put the positions onto the GPU
-    if (bufferInfo === null) {
-      bufferInfo = twgl.createBufferInfoFromArrays(gl, {
+    if (agentBufferInfo === null) {
+      agentBufferInfo = twgl.createBufferInfoFromArrays(gl, {
         position: vertices,
       });
     } else {
-      twgl.setAttribInfoBufferFromArray(gl, bufferInfo.attribs.position, vertices);
+      twgl.setAttribInfoBufferFromArray(gl, agentBufferInfo.attribs.position, vertices);
     }
-
     // Draw the new positions
-    gl.useProgram(programInfo.program);
-    twgl.setBuffersAndAttributes(gl, programInfo, bufferInfo);
+    gl.useProgram(agentProgramInfo.program);
+    twgl.setBuffersAndAttributes(gl, agentProgramInfo, agentBufferInfo);
     // twgl.setUniforms(programInfo, uniforms);
-    twgl.drawBufferInfo(gl, bufferInfo, gl.POINTS);
+    twgl.drawBufferInfo(gl, agentBufferInfo, gl.POINTS);
+
+    /** Copy FB2 to canvas for final result **/
+    twgl.bindFramebufferInfo(gl, null);
+    gl.useProgram(copyProgramInfo.program);
+    twgl.setBuffersAndAttributes(gl, copyProgramInfo, quadBufferInfo);
+    twgl.setUniforms(copyProgramInfo, {
+      u_texture: fadeFrameBuffer2.attachments[0],
+    });
+    twgl.drawBufferInfo(gl, quadBufferInfo, gl.TRIANGLES);
 
     // Store the new pixels for the next round
     gl.readPixels(
@@ -178,6 +264,11 @@ void main() {
       gl.UNSIGNED_BYTE,
       pixels
     );
+
+    // Swap frame buffers around so next time we use them the other way around
+    const temp = fadeFrameBuffer1;
+    fadeFrameBuffer1 = fadeFrameBuffer2;
+    fadeFrameBuffer2 = temp;
   }
 
   initAgents();
