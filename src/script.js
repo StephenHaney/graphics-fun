@@ -62,7 +62,7 @@ void main() {
 
 (() => {
   const canvas = document.getElementById('rendering-canvas');
-  const gl = canvas.getContext('webgl');
+  const gl = canvas.getContext('webgl', { antialias: true, premultipliedAlpha: false });
   // const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
   const agentProgramInfo = twgl.createProgramInfo(gl, [vsAgents, fsAgents]);
   const fadeProgramInfo = twgl.createProgramInfo(gl, [vsQuad, fsFade]);
@@ -101,7 +101,7 @@ void main() {
   const agents = [];
   function initAgents() {
     // Generate agents
-    for (let i = 0; i < 25000; i++) {
+    for (let i = 0; i < 20000; i++) {
       agents.push({
         x: getRandomNumber(0, canvas.clientWidth),
         y: getRandomNumber(0, canvas.clientHeight),
@@ -169,16 +169,19 @@ void main() {
           );
           // vertices.push(...pixelsToClip(agent.x + rightDx * 23, agent.y + rightDy * 23));
 
-          if (leftSample.a !== 0) {
+          const turnLeft = leftSample.a > rightSample.a;
+          const turnRight = rightSample.a > leftSample.a;
+
+          if (turnLeft) {
             // console.log('turn left!');
             // Turn left!
-            agent.rotation += 0.7;
+            agent.rotation += 0.5;
             dx = leftDx;
             dy = leftDy;
-          } else if (rightSample.a !== 0) {
+          } else if (turnRight) {
             // console.log('turn right!');
             // Turn right!
-            agent.rotation -= 0.7;
+            agent.rotation -= 0.5;
             dx = rightDx;
             dy = rightDy;
           }
@@ -223,7 +226,7 @@ void main() {
     twgl.setBuffersAndAttributes(gl, fadeProgramInfo, quadBufferInfo);
     twgl.setUniforms(fadeProgramInfo, {
       u_texture: fadeFrameBuffer1.attachments[0],
-      u_mixAmount: 0.05,
+      u_mixAmount: 0.01,
       u_fadeColor: [0, 0, 0, 0],
     });
     twgl.drawBufferInfo(gl, quadBufferInfo, gl.TRIANGLES);
