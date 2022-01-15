@@ -40,10 +40,32 @@ varying vec2 v_texcoord;
 uniform sampler2D u_texture;
 uniform float u_mixAmount;
 uniform vec4 u_fadeColor;
+uniform vec2 u_textureSize;
 
 void main() {
-  vec4 color = texture2D(u_texture, v_texcoord);
-  gl_FragColor = mix(color, u_fadeColor, u_mixAmount);
+  vec2 onePixel = vec2(1.0, 1.0) / u_textureSize;
+
+  vec4 blur_color = (
+    texture2D(u_texture, v_texcoord + onePixel * vec2(-1.0, -1.0)) +
+    texture2D(u_texture, v_texcoord + onePixel * vec2(0.0, -1.0)) +
+    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0, -1.0)) +
+    texture2D(u_texture, v_texcoord + onePixel * vec2(-1.0, 0.0)) +
+    texture2D(u_texture, v_texcoord) +
+    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0,  0.0)) +
+    texture2D(u_texture, v_texcoord + onePixel * vec2(-1.0, 1.0)) +
+    texture2D(u_texture, v_texcoord + onePixel * vec2(0.0,  1.0)) +
+    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0,  1.0))) / 9.0;
+
+  // Fade to transparency
+  vec4 mixed_color = mix(blur_color, u_fadeColor, u_mixAmount);
+
+  if (mixed_color.a < 0.1) {
+    // It never seems to actually get to 0, so this helps it get there:
+    mixed_color = vec4(0, 0, 0, 0);
+  }
+
+  // Blur time
+  gl_FragColor = mixed_color;
 }
 `;
 
@@ -62,7 +84,7 @@ void main() {
 
 (() => {
   const canvas = document.getElementById('rendering-canvas');
-  const gl = canvas.getContext('webgl', { antialias: true, premultipliedAlpha: false });
+  const gl = canvas.getContext('webgl', { antialias: true });
   // const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
   const agentProgramInfo = twgl.createProgramInfo(gl, [vsAgents, fsAgents]);
   const fadeProgramInfo = twgl.createProgramInfo(gl, [vsQuad, fsFade]);
@@ -101,7 +123,7 @@ void main() {
   const agents = [];
   function initAgents() {
     // Generate agents
-    for (let i = 0; i < 20000; i++) {
+    for (let i = 0; i < 10000; i++) {
       agents.push({
         x: getRandomNumber(0, canvas.clientWidth),
         y: getRandomNumber(0, canvas.clientHeight),
@@ -115,7 +137,6 @@ void main() {
   let agentBufferInfo = null;
   /** -1 to 1 quad buffer */
   const quadBufferInfo = twgl.primitives.createXYQuadBufferInfo(gl);
-  console.log(quadBufferInfo);
 
   // Creates an RGBA/UNSIGNED_BYTE texture and depth buffer framebuffer
   const imgFbi = twgl.createFramebufferInfo(gl);
@@ -226,8 +247,9 @@ void main() {
     twgl.setBuffersAndAttributes(gl, fadeProgramInfo, quadBufferInfo);
     twgl.setUniforms(fadeProgramInfo, {
       u_texture: fadeFrameBuffer1.attachments[0],
-      u_mixAmount: 0.01,
+      u_mixAmount: 0.005,
       u_fadeColor: [0, 0, 0, 0],
+      u_textureSize: [gl.drawingBufferWidth, gl.drawingBufferHeight],
     });
     twgl.drawBufferInfo(gl, quadBufferInfo, gl.TRIANGLES);
 
