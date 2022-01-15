@@ -14,7 +14,7 @@ const fsAgents = `
 precision mediump float;
 
 void main() {
-  gl_FragColor = vec4(0.1, 0.3, 0.9, 1.0);
+  gl_FragColor = vec4(0.1, 0.3, 1.0, 1);
 }
 `;
 
@@ -125,12 +125,19 @@ void main() {
   function initAgents() {
     // Generate agents
     for (let i = 0; i < 10000; i++) {
-      agents.push({
-        x: getRandomNumber(0, canvas.clientWidth),
-        y: getRandomNumber(0, canvas.clientHeight),
-        rotation: getRandomNumber(0, Math.PI * 2, false),
-        headStrong: 0,
-      });
+      if (i < 5000) {
+        agents.push({
+          x: canvas.clientWidth / 2,
+          y: canvas.clientHeight / 2,
+          rotation: getRandomNumber(0, Math.PI * 2, false),
+        });
+      } else {
+        agents.push({
+          x: getRandomNumber(0, canvas.clientWidth),
+          y: getRandomNumber(0, canvas.clientHeight),
+          rotation: getRandomNumber(0, Math.PI * 2, false),
+        });
+      }
     }
   }
 
@@ -161,52 +168,42 @@ void main() {
     for (const agent of agents) {
       let dx = Math.cos(agent.rotation);
       let dy = Math.sin(agent.rotation);
-      if (agent.headStrong > 0) {
-        // If it's currently headstrong it's blazing its own path, just decrease its headstrong count
-        agent.headStrong -= 1;
-        // } else if (getRandomNumber(1, 1000) === 1000) {
-        //   // 1 time out of 1000 pick a random new direction to go and go HEADSTRONG
-        //   let newDirection = Math.random(0, 2 * Math.PI, false);
-        //   dx = Math.cos(newDirection);
-        //   dy = Math.sin(newDirection);
-        //   agent.headStrong = 50;
-      } else {
-        // Sample ahead for steering
-        const centerSample = getPixelFromPoint(agent.x + dx * 50, agent.y + dy * 50);
-        // vertices.push(...pixelsToClip(agent.x + dx * 23, agent.y + dy * 23));
-        if (centerSample.a === 0) {
-          // Center is negative, check the sides
-          const leftDx = Math.cos(agent.rotation + 1);
-          const leftDy = Math.sin(agent.rotation + 1);
-          const leftSample = getPixelFromPoint(
-            agent.x + leftDx * 50,
-            agent.y + leftDy * 50
-          );
-          // vertices.push(...pixelsToClip(agent.x + leftDx * 23, agent.y + leftDy * 23));
-          const rightDx = Math.cos(agent.rotation - 1);
-          const rightDy = Math.sin(agent.rotation - 1);
-          const rightSample = getPixelFromPoint(
-            agent.x + rightDx * 50,
-            agent.y + rightDy * 50
-          );
-          // vertices.push(...pixelsToClip(agent.x + rightDx * 23, agent.y + rightDy * 23));
 
-          const turnLeft = leftSample.a > rightSample.a;
-          const turnRight = rightSample.a > leftSample.a;
+      // Sample ahead for steering
+      const centerSample = getPixelFromPoint(agent.x + dx * 50, agent.y + dy * 50);
+      // vertices.push(...pixelsToClip(agent.x + dx * 23, agent.y + dy * 23));
+      if (centerSample.a === 0) {
+        // Center is negative, check the sides
+        const leftDx = Math.cos(agent.rotation + 1);
+        const leftDy = Math.sin(agent.rotation + 1);
+        const leftSample = getPixelFromPoint(
+          agent.x + leftDx * 50,
+          agent.y + leftDy * 50
+        );
+        // vertices.push(...pixelsToClip(agent.x + leftDx * 23, agent.y + leftDy * 23));
+        const rightDx = Math.cos(agent.rotation - 1);
+        const rightDy = Math.sin(agent.rotation - 1);
+        const rightSample = getPixelFromPoint(
+          agent.x + rightDx * 50,
+          agent.y + rightDy * 50
+        );
+        // vertices.push(...pixelsToClip(agent.x + rightDx * 23, agent.y + rightDy * 23));
 
-          if (turnLeft) {
-            // console.log('turn left!');
-            // Turn left!
-            agent.rotation += 0.5;
-            dx = leftDx;
-            dy = leftDy;
-          } else if (turnRight) {
-            // console.log('turn right!');
-            // Turn right!
-            agent.rotation -= 0.5;
-            dx = rightDx;
-            dy = rightDy;
-          }
+        const turnLeft = leftSample.a > rightSample.a;
+        const turnRight = rightSample.a > leftSample.a;
+
+        if (turnLeft) {
+          // console.log('turn left!');
+          // Turn left!
+          agent.rotation += 0.5;
+          dx = leftDx;
+          dy = leftDy;
+        } else if (turnRight) {
+          // console.log('turn right!');
+          // Turn right!
+          agent.rotation -= 0.5;
+          dx = rightDx;
+          dy = rightDy;
         }
       }
 
