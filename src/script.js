@@ -3,18 +3,24 @@ const halfSize = Math.max(1, agentSize / 2);
 
 const vsAgents = `
 attribute vec4 position;
+attribute vec4 color;
+
+varying vec4 final_color;
 
 void main() {
   gl_Position = position;
   gl_PointSize = ${agentSize}.0;
+  final_color = color;
 }
 `;
 
 const fsAgents = `
 precision mediump float;
 
+varying vec4 final_color;
+
 void main() {
-  gl_FragColor = vec4(0.1, 0.3, 1.0, 1);
+  gl_FragColor = final_color;
 }
 `;
 
@@ -121,24 +127,31 @@ void main() {
   makeCanvasFullScreen();
 
   /** Agents */
+  const SETTINGS = {
+    sensorDistance: 50,
+    sensorAngle: 1,
+    turnAngle: 0.7,
+    fade: 0.005,
+  };
+
   const agents = [];
+  const colors = [];
   function initAgents() {
     // Generate agents
-    for (let i = 0; i < 10000; i++) {
-      if (i < 5000) {
-        agents.push({
-          x: canvas.clientWidth / 2,
-          y: canvas.clientHeight / 2,
-          rotation: getRandomNumber(0, Math.PI * 2, false),
-          headstrong: 0,
-        });
+    const agentCount = 12_000;
+    const halfCount = agentCount / 2;
+    for (let i = 0; i < agentCount; i++) {
+      agents.push({
+        x: getRandomNumber(0, canvas.clientWidth),
+        y: getRandomNumber(0, canvas.clientHeight),
+        rotation: getRandomNumber(0, Math.PI * 2, false),
+        headstrong: 0,
+      });
+
+      if (i < halfCount) {
+        colors.push(0.1, 0.3, 0.8, 1.0);
       } else {
-        agents.push({
-          x: getRandomNumber(0, canvas.clientWidth),
-          y: getRandomNumber(0, canvas.clientHeight),
-          rotation: getRandomNumber(0, Math.PI * 2, false),
-          headstrong: 0,
-        });
+        colors.push(0.1, 0.5, 0.95, 1.0);
       }
     }
   }
@@ -175,22 +188,25 @@ void main() {
         agent.headstrong -= 1;
       } else {
         // Sample ahead for steering
-        const centerSample = getPixelFromPoint(agent.x + dx * 50, agent.y + dy * 50);
+        const centerSample = getPixelFromPoint(
+          agent.x + dx * SETTINGS.sensorDistance,
+          agent.y + dy * SETTINGS.sensorDistance
+        );
         // vertices.push(...pixelsToClip(agent.x + dx * 23, agent.y + dy * 23));
         if (centerSample.a === 0) {
           // Center is negative, check the sides
-          const leftDx = Math.cos(agent.rotation + 1);
-          const leftDy = Math.sin(agent.rotation + 1);
+          const leftDx = Math.cos(agent.rotation + SETTINGS.sensorAngle);
+          const leftDy = Math.sin(agent.rotation + SETTINGS.sensorAngle);
           const leftSample = getPixelFromPoint(
-            agent.x + leftDx * 50,
-            agent.y + leftDy * 50
+            agent.x + leftDx * SETTINGS.sensorDistance,
+            agent.y + leftDy * SETTINGS.sensorDistance
           );
           // vertices.push(...pixelsToClip(agent.x + leftDx * 23, agent.y + leftDy * 23));
-          const rightDx = Math.cos(agent.rotation - 1);
-          const rightDy = Math.sin(agent.rotation - 1);
+          const rightDx = Math.cos(agent.rotation - SETTINGS.sensorAngle);
+          const rightDy = Math.sin(agent.rotation - SETTINGS.sensorAngle);
           const rightSample = getPixelFromPoint(
-            agent.x + rightDx * 50,
-            agent.y + rightDy * 50
+            agent.x + rightDx * SETTINGS.sensorDistance,
+            agent.y + rightDy * SETTINGS.sensorDistance
           );
           // vertices.push(...pixelsToClip(agent.x + rightDx * 23, agent.y + rightDy * 23));
 
@@ -200,13 +216,13 @@ void main() {
           if (turnLeft) {
             // console.log('turn left!');
             // Turn left!
-            agent.rotation += 0.5;
+            agent.rotation += SETTINGS.turnAngle;
             dx = leftDx;
             dy = leftDy;
           } else if (turnRight) {
             // console.log('turn right!');
             // Turn right!
-            agent.rotation -= 0.5;
+            agent.rotation -= SETTINGS.turnAngle;
             dx = rightDx;
             dy = rightDy;
           }
@@ -251,7 +267,7 @@ void main() {
     twgl.setBuffersAndAttributes(gl, fadeProgramInfo, quadBufferInfo);
     twgl.setUniforms(fadeProgramInfo, {
       u_texture: fadeFrameBuffer1.attachments[0],
-      u_mixAmount: 0.005,
+      u_mixAmount: SETTINGS.fade,
       u_fadeColor: [0, 0, 0, 0],
       u_textureSize: [gl.drawingBufferWidth, gl.drawingBufferHeight],
     });
@@ -264,6 +280,7 @@ void main() {
     if (agentBufferInfo === null) {
       agentBufferInfo = twgl.createBufferInfoFromArrays(gl, {
         position: vertices,
+        color: colors,
       });
     } else {
       twgl.setAttribInfoBufferFromArray(gl, agentBufferInfo.attribs.position, vertices);
@@ -313,16 +330,54 @@ void main() {
       const distanceY = Math.abs(agent.y - pointerY);
       if (distanceX < 80 && distanceY < 80) {
         agent.rotation = getRandomNumber(0, Math.PI * 2, false);
-        agent.headstrong = 120;
+        agent.headstrong = 300;
       }
     }
   });
 
   /** Controls */
+  // Play/pause
   const playPauseBtn = document.getElementById('btn-play-pause');
   playPauseBtn.addEventListener('click', () => {
     state.playing = !state.playing;
     playPauseBtn.innerText = state.playing ? 'Pause' : 'Play';
+  });
+
+  // Sensor Distance
+  const sensorDistanceInput = document.getElementById('input-sensor-distance');
+  sensorDistanceInput.value = SETTINGS.sensorDistance;
+  sensorDistanceInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      SETTINGS.sensorDistance = Number.parseFloat(e.target.value);
+    }
+  });
+
+  // Sensor Angle
+  const sensorAngleInput = document.getElementById('input-sensor-angle');
+  sensorAngleInput.value = SETTINGS.sensorAngle;
+  sensorAngleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      SETTINGS.sensorAngle = Number.parseFloat(e.target.value);
+    }
+  });
+
+  // Turning angle
+  const turnAngleInput = document.getElementById('input-turn-angle');
+  turnAngleInput.value = SETTINGS.turnAngle;
+  turnAngleInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      console.log(Number.parseFloat(e.target.value));
+      SETTINGS.turnAngle = Number.parseFloat(e.target.value);
+    }
+  });
+
+  // Fade time
+  const fadeInput = document.getElementById('input-fade');
+  fadeInput.value = SETTINGS.fade;
+  fadeInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      SETTINGS.fade = Number.parseFloat(e.target.value);
+    }
   });
 
   function pixelsToClip(x, y) {
