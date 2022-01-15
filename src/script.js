@@ -14,7 +14,7 @@ const fsAgents = `
 precision mediump float;
 
 void main() {
-  gl_FragColor = vec4(0.2, 0.6, 0.8, 1.0);
+  gl_FragColor = vec4(0.1, 0.3, 0.9, 1.0);
 }
 `;
 
@@ -123,7 +123,7 @@ void main() {
   const agents = [];
   function initAgents() {
     // Generate agents
-    for (let i = 0; i < 10000; i++) {
+    for (let i = 0; i < 20000; i++) {
       agents.push({
         x: getRandomNumber(0, canvas.clientWidth),
         y: getRandomNumber(0, canvas.clientHeight),
