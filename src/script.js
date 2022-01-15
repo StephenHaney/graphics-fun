@@ -192,40 +192,33 @@ void main() {
           agent.x + dx * SETTINGS.sensorDistance,
           agent.y + dy * SETTINGS.sensorDistance
         );
-        // vertices.push(...pixelsToClip(agent.x + dx * 23, agent.y + dy * 23));
-        if (centerSample.a === 0) {
-          // Center is negative, check the sides
-          const leftDx = Math.cos(agent.rotation + SETTINGS.sensorAngle);
-          const leftDy = Math.sin(agent.rotation + SETTINGS.sensorAngle);
-          const leftSample = getPixelFromPoint(
-            agent.x + leftDx * SETTINGS.sensorDistance,
-            agent.y + leftDy * SETTINGS.sensorDistance
-          );
-          // vertices.push(...pixelsToClip(agent.x + leftDx * 23, agent.y + leftDy * 23));
-          const rightDx = Math.cos(agent.rotation - SETTINGS.sensorAngle);
-          const rightDy = Math.sin(agent.rotation - SETTINGS.sensorAngle);
-          const rightSample = getPixelFromPoint(
-            agent.x + rightDx * SETTINGS.sensorDistance,
-            agent.y + rightDy * SETTINGS.sensorDistance
-          );
-          // vertices.push(...pixelsToClip(agent.x + rightDx * 23, agent.y + rightDy * 23));
+        const leftDx = Math.cos(agent.rotation + SETTINGS.sensorAngle);
+        const leftDy = Math.sin(agent.rotation + SETTINGS.sensorAngle);
+        const leftSample = getPixelFromPoint(
+          agent.x + leftDx * SETTINGS.sensorDistance,
+          agent.y + leftDy * SETTINGS.sensorDistance
+        );
+        const rightDx = Math.cos(agent.rotation - SETTINGS.sensorAngle);
+        const rightDy = Math.sin(agent.rotation - SETTINGS.sensorAngle);
+        const rightSample = getPixelFromPoint(
+          agent.x + rightDx * SETTINGS.sensorDistance,
+          agent.y + rightDy * SETTINGS.sensorDistance
+        );
 
-          const turnLeft = leftSample.a > rightSample.a;
-          const turnRight = rightSample.a > leftSample.a;
-
-          if (turnLeft) {
-            // console.log('turn left!');
-            // Turn left!
-            agent.rotation += SETTINGS.turnAngle;
-            dx = leftDx;
-            dy = leftDy;
-          } else if (turnRight) {
-            // console.log('turn right!');
-            // Turn right!
-            agent.rotation -= SETTINGS.turnAngle;
-            dx = rightDx;
-            dy = rightDy;
-          }
+        const turnLeft = leftSample.a > centerSample.a && leftSample.a > rightSample.a;
+        const turnRight = rightSample.a > centerSample.a && rightSample.a > leftSample.a;
+        if (turnLeft) {
+          // console.log('turn left!');
+          // Turn left!
+          agent.rotation += SETTINGS.turnAngle;
+          dx = leftDx;
+          dy = leftDy;
+        } else if (turnRight) {
+          // console.log('turn right!');
+          // Turn right!
+          agent.rotation -= SETTINGS.turnAngle;
+          dx = rightDx;
+          dy = rightDy;
         }
       }
 
