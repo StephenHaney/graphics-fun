@@ -105,6 +105,10 @@ void main() {
   /** An array the size of the full canvas buffer to store our pixel data */
   let pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
 
+  /** We cache our canvas size to save DOM API costs during frames */
+  let canvasWidth = 0;
+  let canvasHeight = 0;
+
   // Keep the canvas full screen at all times
   function makeCanvasFullScreen() {
     const controlsWidth = Number.parseInt(
@@ -112,6 +116,8 @@ void main() {
     );
     canvas.height = window.innerHeight;
     canvas.width = window.innerWidth - controlsWidth;
+    canvasWidth = canvas.width;
+    canvasHeight = canvas.height;
 
     if (twgl.resizeCanvasToDisplaySize(gl.canvas)) {
       twgl.resizeFramebufferInfo(gl, fadeFrameBuffer1, fadeAttachments);
@@ -132,26 +138,59 @@ void main() {
     sensorAngle: 1,
     turnAngle: 0.7,
     fade: 0.005,
+    /** Agents will prefer to stay on their current path over turning, this is an alpha amount to boost the center sensor */
+    preferenceToCenter: 0.3,
   };
 
   const agents = [];
   const colors = [];
   function initAgents() {
     // Generate agents
-    const agentCount = 12_000;
+    const agentCount = 30_000;
     const halfCount = agentCount / 2;
+
     for (let i = 0; i < agentCount; i++) {
-      agents.push({
-        x: getRandomNumber(0, canvas.clientWidth),
-        y: getRandomNumber(0, canvas.clientHeight),
-        rotation: getRandomNumber(0, Math.PI * 2, false),
-        headstrong: 0,
-      });
+      const rotation = getRandomNumber(0, Math.PI * 2, false);
+      // agents.push({
+      //   x: getRandomNumber(0, canvasWidth),
+      //   y: getRandomNumber(0, canvasHeight),
+      //   rotation,
+      //   dx: Math.cos(rotation),
+      //   dy: Math.sin(rotation),
+      //   headstrong: 0,
+      // });
+
+      // agents.push({
+      //   x: canvasWidth / 2,
+      //   y: canvasHeight / 2,
+      //   rotation,
+      //   dx: Math.cos(rotation),
+      //   dy: Math.sin(rotation),
+      //   headstrong: 0,
+      // });
 
       if (i < halfCount) {
-        colors.push(0.1, 0.3, 0.8, 1.0);
+        colors.push(0.1, 0.2, 0.9, 1);
+
+        agents.push({
+          x: canvasWidth / 2,
+          y: canvasHeight / 2,
+          rotation,
+          dx: Math.cos(rotation),
+          dy: Math.sin(rotation),
+          headstrong: 0,
+        });
       } else {
-        colors.push(0.1, 0.5, 0.95, 1.0);
+        colors.push(0.1, 0.4, 0.95, 1);
+
+        agents.push({
+          x: getRandomNumber(0, canvasWidth),
+          y: getRandomNumber(0, canvasHeight),
+          rotation,
+          dx: Math.cos(rotation),
+          dy: Math.sin(rotation),
+          headstrong: 0,
+        });
       }
     }
   }
@@ -172,88 +211,108 @@ void main() {
   var fadeFrameBuffer1 = twgl.createFramebufferInfo(gl, fadeAttachments);
   var fadeFrameBuffer2 = twgl.createFramebufferInfo(gl, fadeAttachments);
 
-  function draw(time) {
-    requestAnimationFrame(draw);
+  function update(time) {
+    requestAnimationFrame(update);
     if (!state.playing) {
       return;
     }
 
     const vertices = [];
 
-    for (const agent of agents) {
-      let dx = Math.cos(agent.rotation);
-      let dy = Math.sin(agent.rotation);
+    updateAgents(vertices);
+    draw(vertices);
+  }
+
+  function updateAgents(vertices) {
+    for (let i = 0; i < agents.length; i++) {
+      const agent = agents[i];
 
       if (agent.headstrong > 0) {
         agent.headstrong -= 1;
+        // Move forward
+        agent.x += agent.dx;
+        agent.y += agent.dy;
       } else {
         // Sample ahead for steering
-        const centerSample = getPixelFromPoint(
-          agent.x + dx * SETTINGS.sensorDistance,
-          agent.y + dy * SETTINGS.sensorDistance
-        );
         const leftDx = Math.cos(agent.rotation + SETTINGS.sensorAngle);
         const leftDy = Math.sin(agent.rotation + SETTINGS.sensorAngle);
+        const rightDx = Math.cos(agent.rotation - SETTINGS.sensorAngle);
+        const rightDy = Math.sin(agent.rotation - SETTINGS.sensorAngle);
+
+        const centerSample = getPixelFromPoint(
+          agent.x + agent.dx * SETTINGS.sensorDistance,
+          agent.y + agent.dy * SETTINGS.sensorDistance
+        );
         const leftSample = getPixelFromPoint(
           agent.x + leftDx * SETTINGS.sensorDistance,
           agent.y + leftDy * SETTINGS.sensorDistance
         );
-        const rightDx = Math.cos(agent.rotation - SETTINGS.sensorAngle);
-        const rightDy = Math.sin(agent.rotation - SETTINGS.sensorAngle);
         const rightSample = getPixelFromPoint(
           agent.x + rightDx * SETTINGS.sensorDistance,
           agent.y + rightDy * SETTINGS.sensorDistance
         );
 
-        const turnLeft = leftSample.a > centerSample.a && leftSample.a > rightSample.a;
-        const turnRight = rightSample.a > centerSample.a && rightSample.a > leftSample.a;
-        if (turnLeft) {
-          // console.log('turn left!');
+        if (
+          leftSample[3] > rightSample[3] &&
+          leftSample[3] > centerSample[3] + SETTINGS.preferenceToCenter
+        ) {
           // Turn left!
           agent.rotation += SETTINGS.turnAngle;
-          dx = leftDx;
-          dy = leftDy;
-        } else if (turnRight) {
-          // console.log('turn right!');
+          agent.x += leftDx;
+          agent.y += leftDy;
+          agent.dx = leftDx;
+          agent.dy = leftDy;
+        } else if (
+          rightSample[3] > leftSample[3] &&
+          rightSample[3] > centerSample[3] + SETTINGS.preferenceToCenter
+        ) {
           // Turn right!
           agent.rotation -= SETTINGS.turnAngle;
-          dx = rightDx;
-          dy = rightDy;
+          agent.x += rightDx;
+          agent.y += rightDy;
+          agent.dx = rightDx;
+          agent.dy = rightDy;
+        } else {
+          // Move forward
+          agent.x += agent.dx;
+          agent.y += agent.dy;
         }
       }
 
-      // Move forward
-      agent.x += dx;
-      agent.y += dy;
-
       // Flip X if it hits bounds
       if (agent.x - halfSize <= 0) {
+        // Flip the dx and calculate it in radians
         agent.x = halfSize;
+        agent.dx = -agent.dx;
+        agent.rotation = Math.atan2(agent.dy, agent.dx);
+      } else if (agent.x + halfSize >= canvasWidth) {
         // Flip the dx and calculate it in radians
-        agent.rotation = Math.atan2(dy, -dx);
-      } else if (agent.x + halfSize >= canvas.clientWidth) {
-        agent.x = canvas.clientWidth - halfSize;
-        // Flip the dx and calculate it in radians
-        agent.rotation = Math.atan2(dy, -dx);
+        agent.x = canvasWidth - halfSize;
+        agent.dx = -agent.dx;
+        agent.rotation = Math.atan2(agent.dy, agent.dx);
       }
 
       // Flip Y if it hits bounds
       if (agent.y - halfSize <= 0) {
+        // Flip the dy and calculate it in radians
         agent.y = halfSize;
+        agent.dy = -agent.dy;
+        agent.rotation = Math.atan2(agent.dy, agent.dx);
+      } else if (agent.y + halfSize >= canvasHeight) {
         // Flip the dy and calculate it in radians
-        agent.rotation = Math.atan2(-dy, dx);
-      } else if (agent.y + halfSize >= canvas.clientHeight) {
-        agent.y = canvas.clientHeight - halfSize;
-        // Flip the dy and calculate it in radians
-        agent.rotation = Math.atan2(-dy, dx);
+        agent.y = canvasHeight - halfSize;
+        agent.dy = -agent.dy;
+        agent.rotation = Math.atan2(agent.dy, agent.dx);
       }
 
       // Push WebGL clipspace vertices
-      const xToClip = (agent.x / canvas.clientWidth) * 2 - 1;
-      const yToClip = (agent.y / canvas.clientHeight) * 2 - 1;
+      const xToClip = (agent.x / canvasWidth) * 2 - 1;
+      const yToClip = (agent.y / canvasHeight) * 2 - 1;
       vertices.push(xToClip, yToClip, 1);
     }
+  }
 
+  function draw(vertices) {
     // Fade by copying from frameBuffer1 to with a fade frameBuffer2
     twgl.bindFramebufferInfo(gl, fadeFrameBuffer2);
     gl.useProgram(fadeProgramInfo.program);
@@ -310,13 +369,14 @@ void main() {
     fadeFrameBuffer2 = temp;
   }
 
+  /** Kick it all off */
   initAgents();
-  requestAnimationFrame(draw);
+  requestAnimationFrame(update);
 
   /** Click splatter */
   canvas.addEventListener('pointerdown', (e) => {
     const pointerX = e.x - canvas.offsetLeft;
-    const pointerY = canvas.clientHeight - (e.y - canvas.offsetTop);
+    const pointerY = canvasHeight - (e.y - canvas.offsetTop);
 
     for (const agent of agents) {
       const distanceX = Math.abs(agent.x - pointerX);
@@ -383,16 +443,16 @@ void main() {
 
   function getPixelFromPoint(x, y) {
     const index = (Math.floor(y) * gl.drawingBufferWidth + Math.floor(x)) * 4;
-    return {
-      r: pixels[index] || 0,
-      g: pixels[index + 1] || 0,
-      b: pixels[index + 2] || 0,
-      a: pixels[index + 3] || 0,
-    };
+    return [
+      pixels[index] || 0,
+      pixels[index + 1] || 0,
+      pixels[index + 2] || 0,
+      pixels[index + 3] || 0,
+    ];
   }
 })();
 
 function getRandomNumber(min, max, round = true) {
-  const result = Math.random() * (max - min + 1) + min;
-  return round ? Math.floor(result) : result;
+  const result = Math.random() * (max - min) + min;
+  return round ? Math.round(result) : result;
 }
