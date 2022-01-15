@@ -54,12 +54,13 @@ void main() {
     texture2D(u_texture, v_texcoord + onePixel * vec2(1.0,  0.0)) +
     texture2D(u_texture, v_texcoord + onePixel * vec2(-1.0, 1.0)) +
     texture2D(u_texture, v_texcoord + onePixel * vec2(0.0,  1.0)) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0,  1.0))) / 9.0;
+    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0,  1.0))
+    ) / 9.0;
 
   // Fade to transparency
   vec4 mixed_color = mix(blur_color, u_fadeColor, u_mixAmount);
 
-  if (mixed_color.a < 0.1) {
+  if (mixed_color.a < 0.04) {
     // It never seems to actually get to 0, so this helps it get there:
     mixed_color = vec4(0, 0, 0, 0);
   }
@@ -84,7 +85,7 @@ void main() {
 
 (() => {
   const canvas = document.getElementById('rendering-canvas');
-  const gl = canvas.getContext('webgl', { antialias: true });
+  const gl = canvas.getContext('webgl', { antialias: true, premultipliedAlpha: false });
   // const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
   const agentProgramInfo = twgl.createProgramInfo(gl, [vsAgents, fsAgents]);
   const fadeProgramInfo = twgl.createProgramInfo(gl, [vsQuad, fsFade]);
@@ -123,7 +124,7 @@ void main() {
   const agents = [];
   function initAgents() {
     // Generate agents
-    for (let i = 0; i < 20000; i++) {
+    for (let i = 0; i < 10000; i++) {
       agents.push({
         x: getRandomNumber(0, canvas.clientWidth),
         y: getRandomNumber(0, canvas.clientHeight),
