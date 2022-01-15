@@ -140,6 +140,7 @@ void main() {
     fade: 0.005,
     /** Agents will prefer to stay on their current path over turning, this is an alpha amount to boost the center sensor */
     preferenceToCenter: 0.3,
+    color: [0.1, 0.2, 0.9, 1],
   };
 
   const agents = [];
@@ -151,27 +152,10 @@ void main() {
 
     for (let i = 0; i < agentCount; i++) {
       const rotation = getRandomNumber(0, Math.PI * 2, false);
-      // agents.push({
-      //   x: getRandomNumber(0, canvasWidth),
-      //   y: getRandomNumber(0, canvasHeight),
-      //   rotation,
-      //   dx: Math.cos(rotation),
-      //   dy: Math.sin(rotation),
-      //   headstrong: 0,
-      // });
 
-      // agents.push({
-      //   x: canvasWidth / 2,
-      //   y: canvasHeight / 2,
-      //   rotation,
-      //   dx: Math.cos(rotation),
-      //   dy: Math.sin(rotation),
-      //   headstrong: 0,
-      // });
+      colors.push(...SETTINGS.color);
 
       if (i < halfCount) {
-        colors.push(0.1, 0.2, 0.9, 1);
-
         agents.push({
           x: canvasWidth / 2,
           y: canvasHeight / 2,
@@ -181,8 +165,6 @@ void main() {
           headstrong: 0,
         });
       } else {
-        colors.push(0.1, 0.4, 0.95, 1);
-
         agents.push({
           x: getRandomNumber(0, canvasWidth),
           y: getRandomNumber(0, canvasHeight),
@@ -424,12 +406,19 @@ void main() {
     }
   });
 
-  // Fade time
-  const fadeInput = document.getElementById('input-fade');
-  fadeInput.value = SETTINGS.fade;
-  fadeInput.addEventListener('keydown', (e) => {
+  // Color
+  const color1Input = document.getElementById('input-color-1');
+  color1Input.value = SETTINGS.color.join(' ');
+  color1Input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      SETTINGS.fade = Number.parseFloat(e.target.value);
+      const colorArray = e.target.value.split(' ').map((str) => Number.parseFloat(str));
+      SETTINGS.color = colorArray;
+
+      // Update and push the color buffer
+      for (let i = 0; i < colors.length; i++) {
+        colors[i] = colorArray[i % 4];
+      }
+      twgl.setAttribInfoBufferFromArray(gl, agentBufferInfo.attribs.color, colors);
     }
   });
 
