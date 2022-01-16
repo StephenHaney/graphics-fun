@@ -44,35 +44,29 @@ precision mediump float;
 varying vec2 v_texcoord;
 
 uniform sampler2D u_texture;
-uniform float u_mixAmount;
-uniform vec4 u_fadeColor;
 uniform vec2 u_textureSize;
 
 void main() {
-  vec2 onePixel = vec2(1.0, 1.0) / u_textureSize;
+  vec2 onePixel = 1.0 / u_textureSize;
 
-  vec4 blur_color = (
-    texture2D(u_texture, v_texcoord + onePixel * vec2(-1.0, -1.0)) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(0.0, -1.0)) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0, -1.0)) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(-1.0, 0.0)) +
-    texture2D(u_texture, v_texcoord) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0,  0.0)) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(-1.0, 1.0)) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(0.0,  1.0)) +
-    texture2D(u_texture, v_texcoord + onePixel * vec2(1.0,  1.0))
-    ) / 9.0;
+  vec4 sum = vec4(0, 0, 0, 1);
+  float colorCount = 0.0;
 
-  // Fade to transparency
-  vec4 mixed_color = mix(blur_color, u_fadeColor, u_mixAmount);
-
-  if (mixed_color.a < 0.04) {
-    // It never seems to actually get to 0, so this helps it get there:
-    mixed_color = vec4(0, 0, 0, 0);
+  // First do a 3x3 blur
+  for (float x = -1.0; x <= 1.0; x += 1.0) {
+    for (float y = -1.0; y <= 1.0; y += 1.0) {
+      vec2 samplePos = v_texcoord + vec2(x * onePixel.x, y * onePixel.y);
+      sum += texture2D(u_texture, samplePos);
+      colorCount += 1.0;
+    }
   }
+  vec4 blurColor = vec4(sum / colorCount);
 
-  // Blur time
-  gl_FragColor = mixed_color;
+  // The actual color from this coordinate
+  vec4 ownColor = texture2D(u_texture, v_texcoord);
+  vec4 mixedColor = mix(mix(ownColor, blurColor, 0.3), vec4(0, 0, 0, 1), 0.008) - 0.002;
+
+  gl_FragColor = mixedColor;
 }
 `;
 
@@ -91,7 +85,10 @@ void main() {
 
 (() => {
   const canvas = document.getElementById('rendering-canvas');
-  const gl = canvas.getContext('webgl', { antialias: true, premultipliedAlpha: false });
+  const gl = canvas.getContext('webgl', {
+    alpha: false,
+    antialias: true,
+  });
   // const gl = canvas.getContext('webgl', { preserveDrawingBuffer: true });
   const agentProgramInfo = twgl.createProgramInfo(gl, [vsAgents, fsAgents]);
   const fadeProgramInfo = twgl.createProgramInfo(gl, [vsQuad, fsFade]);
@@ -134,20 +131,19 @@ void main() {
 
   /** Agents */
   const SETTINGS = {
-    sensorDistance: 50,
+    sensorDistance: 40,
     sensorAngle: 1,
-    turnAngle: 0.7,
-    fade: 0.005,
+    turnAngle: 1,
     /** Agents will prefer to stay on their current path over turning, this is an alpha amount to boost the center sensor */
-    preferenceToCenter: 0.3,
-    color: [0.1, 0.2, 0.9, 1],
+    preferenceToCenter: 0.8,
+    color: [0.4, 0.2, 0.9, 1],
   };
 
   const agents = [];
   const colors = [];
   function initAgents() {
     // Generate agents
-    const agentCount = 30_000;
+    const agentCount = 20_000;
     const halfCount = agentCount / 2;
 
     for (let i = 0; i < agentCount; i++) {
@@ -162,7 +158,7 @@ void main() {
           rotation,
           dx: Math.cos(rotation),
           dy: Math.sin(rotation),
-          headstrong: 0,
+          headstrong: 150,
         });
       } else {
         agents.push({
@@ -225,6 +221,7 @@ void main() {
           agent.x + agent.dx * SETTINGS.sensorDistance,
           agent.y + agent.dy * SETTINGS.sensorDistance
         );
+
         const leftSample = getPixelFromPoint(
           agent.x + leftDx * SETTINGS.sensorDistance,
           agent.y + leftDy * SETTINGS.sensorDistance
@@ -235,8 +232,8 @@ void main() {
         );
 
         if (
-          leftSample[3] > rightSample[3] &&
-          leftSample[3] > centerSample[3] + SETTINGS.preferenceToCenter
+          leftSample[2] > rightSample[2] &&
+          leftSample[2] > centerSample[2] + SETTINGS.preferenceToCenter
         ) {
           // Turn left!
           agent.rotation += SETTINGS.turnAngle;
@@ -244,9 +241,10 @@ void main() {
           agent.y += leftDy;
           agent.dx = leftDx;
           agent.dy = leftDy;
+          agent.headstrong = 10;
         } else if (
-          rightSample[3] > leftSample[3] &&
-          rightSample[3] > centerSample[3] + SETTINGS.preferenceToCenter
+          rightSample[2] > leftSample[2] &&
+          rightSample[2] > centerSample[2] + SETTINGS.preferenceToCenter
         ) {
           // Turn right!
           agent.rotation -= SETTINGS.turnAngle;
@@ -254,6 +252,7 @@ void main() {
           agent.y += rightDy;
           agent.dx = rightDx;
           agent.dy = rightDy;
+          agent.headstrong = 10;
         } else {
           // Move forward
           agent.x += agent.dx;
@@ -301,8 +300,6 @@ void main() {
     twgl.setBuffersAndAttributes(gl, fadeProgramInfo, quadBufferInfo);
     twgl.setUniforms(fadeProgramInfo, {
       u_texture: fadeFrameBuffer1.attachments[0],
-      u_mixAmount: SETTINGS.fade,
-      u_fadeColor: [0, 0, 0, 0],
       u_textureSize: [gl.drawingBufferWidth, gl.drawingBufferHeight],
     });
     twgl.drawBufferInfo(gl, quadBufferInfo, gl.TRIANGLES);
@@ -365,6 +362,8 @@ void main() {
       const distanceY = Math.abs(agent.y - pointerY);
       if (distanceX < 80 && distanceY < 80) {
         agent.rotation = getRandomNumber(0, Math.PI * 2, false);
+        agent.dx = Math.cos(agent.rotation);
+        agent.dy = Math.sin(agent.rotation);
         agent.headstrong = 300;
       }
     }
