@@ -64,7 +64,7 @@ void main() {
 
   // The actual color from this coordinate
   vec4 ownColor = texture2D(u_texture, v_texcoord);
-  vec4 mixedColor = mix(mix(ownColor, blurColor, 0.3), vec4(0, 0, 0, 1), 0.008) - 0.002;
+  vec4 mixedColor = mix(mix(ownColor, blurColor, 0.3), vec4(0, 0, 0, 1), 0.008) - 0.003;
 
   gl_FragColor = mixedColor;
 }
@@ -132,8 +132,8 @@ void main() {
   /** Agents */
   const SETTINGS = {
     sensorDistance: 40,
-    sensorAngle: 1,
-    turnAngle: 1,
+    sensorAngle: 0.9,
+    turnAngle: 0.9,
     /** Agents will prefer to stay on their current path over turning, this is an alpha amount to boost the center sensor */
     preferenceToCenter: 0.8,
     color: [0.4, 0.2, 0.9, 1],
