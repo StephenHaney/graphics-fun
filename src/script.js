@@ -136,14 +136,15 @@ void main() {
     turnAngle: 0.9,
     /** Agents will prefer to stay on their current path over turning, this is an alpha amount to boost the center sensor */
     preferenceToCenter: 0.8,
-    color: [0.4, 0.2, 0.9, 1],
+    color: [0.6, 0.6, 1, 1],
+    playSpeed: 2,
   };
 
   const agents = [];
   const colors = [];
   function initAgents() {
     // Generate agents
-    const agentCount = 20_000;
+    const agentCount = 40_000;
     const halfCount = agentCount / 2;
 
     for (let i = 0; i < agentCount; i++) {
@@ -201,15 +202,26 @@ void main() {
     draw(vertices);
   }
 
+  /** Once a frame we shoot an agent off in a random direction */
+  let luckyMutationIndex = 0;
   function updateAgents(vertices) {
     for (let i = 0; i < agents.length; i++) {
       const agent = agents[i];
 
-      if (agent.headstrong > 0) {
+      if (i === luckyMutationIndex) {
+        luckyMutationIndex = getRandomNumber(0, agents.length);
+        // Randomly pick a new direction
+        agent.rotation = getRandomNumber(0, Math.PI * 2, false);
+        agent.dx = Math.cos(agent.rotation);
+        agent.dy = Math.sin(agent.rotation);
+        agent.x += agent.dx * SETTINGS.playSpeed;
+        agent.y += agent.dy * SETTINGS.playSpeed;
+        agent.headstrong = 30;
+      } else if (agent.headstrong > 0) {
         agent.headstrong -= 1;
         // Move forward
-        agent.x += agent.dx;
-        agent.y += agent.dy;
+        agent.x += agent.dx * SETTINGS.playSpeed;
+        agent.y += agent.dy * SETTINGS.playSpeed;
       } else {
         // Sample ahead for steering
         const leftDx = Math.cos(agent.rotation + SETTINGS.sensorAngle);
@@ -237,26 +249,26 @@ void main() {
         ) {
           // Turn left!
           agent.rotation += SETTINGS.turnAngle;
-          agent.x += leftDx;
-          agent.y += leftDy;
+          agent.x += leftDx * SETTINGS.playSpeed;
+          agent.y += leftDy * SETTINGS.playSpeed;
           agent.dx = leftDx;
           agent.dy = leftDy;
-          agent.headstrong = 10;
+          // agent.headstrong = 10;
         } else if (
           rightSample[2] > leftSample[2] &&
           rightSample[2] > centerSample[2] + SETTINGS.preferenceToCenter
         ) {
           // Turn right!
           agent.rotation -= SETTINGS.turnAngle;
-          agent.x += rightDx;
-          agent.y += rightDy;
+          agent.x += rightDx * SETTINGS.playSpeed;
+          agent.y += rightDy * SETTINGS.playSpeed;
           agent.dx = rightDx;
           agent.dy = rightDy;
-          agent.headstrong = 10;
+          // agent.headstrong = 10;
         } else {
           // Move forward
-          agent.x += agent.dx;
-          agent.y += agent.dy;
+          agent.x += agent.dx * SETTINGS.playSpeed;
+          agent.y += agent.dy * SETTINGS.playSpeed;
         }
       }
 
@@ -400,7 +412,6 @@ void main() {
   turnAngleInput.value = SETTINGS.turnAngle;
   turnAngleInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-      console.log(Number.parseFloat(e.target.value));
       SETTINGS.turnAngle = Number.parseFloat(e.target.value);
     }
   });
@@ -418,6 +429,15 @@ void main() {
         colors[i] = colorArray[i % 4];
       }
       twgl.setAttribInfoBufferFromArray(gl, agentBufferInfo.attribs.color, colors);
+    }
+  });
+
+  // Play speed
+  const speedInput = document.getElementById('input-speed');
+  speedInput.value = SETTINGS.playSpeed;
+  speedInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      SETTINGS.playSpeed = Number.parseFloat(e.target.value);
     }
   });
 
