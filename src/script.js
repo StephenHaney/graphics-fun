@@ -64,7 +64,7 @@ void main() {
 
   // The actual color from this coordinate
   vec4 ownColor = texture2D(u_texture, v_texcoord);
-  vec4 mixedColor = mix(mix(ownColor, blurColor, 0.3), vec4(0, 0, 0, 1), 0.008) - 0.003;
+  vec4 mixedColor = mix(mix(ownColor, blurColor, 0.3), vec4(0, 0, 0, 1), 0.007) - 0.003;
 
   gl_FragColor = mixedColor;
 }
