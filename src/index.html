@@ -24,6 +24,21 @@
         margin: 0;
         padding: 0;
         background-color: #000;
+        color: #fff;
+
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial,
+          sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+        font-size: 16px;
+
+        user-select: none;
+      }
+
+      a {
+        color: #ddf;
+      }
+
+      a:hover {
+        color: #aaf;
       }
 
       .wrapper {
@@ -31,21 +46,68 @@
         align-items: stretch;
       }
 
-      :root {
-        --controls-width: 100px;
-      }
-
       .controls {
-        width: var(--controls-width);
-        background-color: #222;
-        display: flex;
-        flex-direction: column;
-        gap: 25px;
-        color: #eee;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: none;
+      }
+      @media screen and (min-width: 900px) {
+        .controls {
+          display: grid;
+          position: fixed;
+          align-items: center;
+          bottom: 0;
+          left: 0;
+          grid-template-columns: auto auto;
+          flex-direction: column;
+          color: #ddd;
+          gap: 25px;
+          padding: 25px;
+        }
       }
 
-      .controls input {
-        max-width: 80%;
+      button {
+        padding: 10px 10px;
+        font-size: 16px;
+        border-radius: 0;
+        border: 2px solid #eee;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        opacity: 0.8;
+        user-select: none;
+      }
+
+      button:hover {
+        opacity: 1;
+      }
+
+      label {
+        user-select: none;
+      }
+
+      input {
+        padding: 4px 10px;
+        opacity: 0.8;
+        font-size: 16px;
+        border-radius: 0;
+        border: 0;
+        border: 2px solid #eee;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        user-select: initial;
+      }
+
+      #btn-show-controls {
+        position: fixed;
+        bottom: 25px;
+        left: 25px;
+      }
+
+      body.showing-controls #btn-show-controls {
+        display: none;
+      }
+
+      body:not(.showing-controls) .controls {
+        display: none;
       }
 
       canvas {
@@ -56,36 +118,34 @@
     </style>
   </head>
 
-  <body>
+  <body class="showing-controls">
     <div class="wrapper">
       <div class="controls">
+        <label for="input-sensor-distance">sensor distance</label>
+        <input id="input-sensor-distance" />
+
+        <label for="input-sensor-angle">sensor angle</label>
+        <input id="input-sensor-angle" />
+
+        <label for="input-turn-angle">turning angle</label>
+        <input id="input-turn-angle" />
+
+        <label for="input-color-1">color:<br />r g b a (0-1)</label>
+        <input id="input-color-1" />
+
+        <label for="input-speed">play speed</label>
+        <input id="input-speed" />
+
+        <div style="grid-column: span 2">
+          <strong>Welcome to Physarum</strong> by
+          <a href="https://stephenhaney.com/">Stephen Haney</a>
+        </div>
+
+        <button id="btn-hide-controls">Hide Controls</button>
         <button id="btn-play-pause">Pause</button>
-
-        <div>
-          sensor distance
-          <input id="input-sensor-distance" />
-        </div>
-
-        <div>
-          sensor angle
-          <input id="input-sensor-angle" />
-        </div>
-
-        <div>
-          turning angle
-          <input id="input-turn-angle" />
-        </div>
-
-        <div>
-          color:<br />r g b a 0-1
-          <input id="input-color-1" />
-        </div>
-
-        <div>
-          play speed multiplier
-          <input id="input-speed" />
-        </div>
       </div>
+      <button id="btn-show-controls">Controls</button>
+
       <canvas id="rendering-canvas"></canvas>
     </div>
     <script src="twgl.min.js"></script>

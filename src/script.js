@@ -64,7 +64,7 @@ void main() {
 
   // The actual color from this coordinate
   vec4 ownColor = texture2D(u_texture, v_texcoord);
-  vec4 mixedColor = mix(mix(ownColor, blurColor, 0.3), vec4(0, 0, 0, 1), 0.007) - 0.003;
+  vec4 mixedColor = mix(mix(ownColor, blurColor, 0.5), vec4(0, 0, 0, 1), 0.007) - 0.003;
 
   gl_FragColor = mixedColor;
 }
@@ -102,27 +102,40 @@ void main() {
   /** An array the size of the full canvas buffer to store our pixel data */
   let pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
 
+  /** Stores the positions of all the dots */
+  let agentBufferInfo = null;
+  /** -1 to 1 quad buffer */
+  const quadBufferInfo = twgl.primitives.createXYQuadBufferInfo(gl);
+
+  // Creates 2 RGBA texture + depth framebuffers, we draw to these and ping pong back and forth to fade all pixels to black
+  // So say we last drew to buffer2... draw buffer2 to buffer1 with a reduction towards black... then draw new stuff on buffer1... then draw buffer1 to canvas
+  // Next time we'll draw buffer1 to buffer2 with a fade to black, draw new things to buffer2, draw buffer2 to canvas, etc etc
+  let fadeAttachments = [
+    { format: gl.RGBA, min: gl.NEAREST, max: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE },
+    { format: gl.DEPTH_STENCIL },
+  ];
+  let fadeFrameBuffer1 = twgl.createFramebufferInfo(gl, fadeAttachments);
+  let fadeFrameBuffer2 = twgl.createFramebufferInfo(gl, fadeAttachments);
+
   /** We cache our canvas size to save DOM API costs during frames */
   let canvasWidth = 0;
   let canvasHeight = 0;
 
   // Keep the canvas full screen at all times
   function makeCanvasFullScreen() {
-    const controlsWidth = Number.parseInt(
-      getComputedStyle(document.documentElement).getPropertyValue('--controls-width')
-    );
+    canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    canvas.width = window.innerWidth - controlsWidth;
-    canvasWidth = canvas.width;
-    canvasHeight = canvas.height;
 
-    if (twgl.resizeCanvasToDisplaySize(gl.canvas)) {
-      twgl.resizeFramebufferInfo(gl, fadeFrameBuffer1, fadeAttachments);
-      twgl.resizeFramebufferInfo(gl, fadeFrameBuffer2, fadeAttachments);
-    }
+    // Resize the fade buffers with the new size
+    twgl.resizeFramebufferInfo(gl, fadeFrameBuffer1, fadeAttachments);
+    twgl.resizeFramebufferInfo(gl, fadeFrameBuffer2, fadeAttachments);
 
     // Create a new pixel buffer with our new size
     pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+
+    // Cache the sizes for fast usage
+    canvasWidth = canvas.width;
+    canvasHeight = canvas.height;
   }
   // Resize listener:
   window.addEventListener('resize', makeCanvasFullScreen);
@@ -136,7 +149,7 @@ void main() {
     turnAngle: 0.9,
     /** Agents will prefer to stay on their current path over turning, this is an alpha amount to boost the center sensor */
     preferenceToCenter: 0.8,
-    color: [0.6, 0.6, 1, 1],
+    defaultColor: [0.6, 0.6, 1, 1],
     playSpeed: 2,
   };
 
@@ -150,9 +163,8 @@ void main() {
     for (let i = 0; i < agentCount; i++) {
       const rotation = getRandomNumber(0, Math.PI * 2, false);
 
-      colors.push(...SETTINGS.color);
-
       if (i < halfCount) {
+        colors.push(...SETTINGS.defaultColor);
         agents.push({
           x: canvasWidth / 2,
           y: canvasHeight / 2,
@@ -162,6 +174,7 @@ void main() {
           headstrong: 150,
         });
       } else {
+        colors.push(...SETTINGS.defaultColor);
         agents.push({
           x: getRandomNumber(0, canvasWidth),
           y: getRandomNumber(0, canvasHeight),
@@ -174,24 +187,9 @@ void main() {
     }
   }
 
-  /** Stores the positions of all the dots */
-  let agentBufferInfo = null;
-  /** -1 to 1 quad buffer */
-  const quadBufferInfo = twgl.primitives.createXYQuadBufferInfo(gl);
-
-  // Creates an RGBA/UNSIGNED_BYTE texture and depth buffer framebuffer
-  const imgFbi = twgl.createFramebufferInfo(gl);
-
-  // Creates 2 RGBA texture + depth framebuffers
-  var fadeAttachments = [
-    { format: gl.RGBA, min: gl.NEAREST, max: gl.NEAREST, wrap: gl.CLAMP_TO_EDGE },
-    { format: gl.DEPTH_STENCIL },
-  ];
-  var fadeFrameBuffer1 = twgl.createFramebufferInfo(gl, fadeAttachments);
-  var fadeFrameBuffer2 = twgl.createFramebufferInfo(gl, fadeAttachments);
-
   function update(time) {
     requestAnimationFrame(update);
+
     if (!state.playing) {
       return;
     }
@@ -418,11 +416,11 @@ void main() {
 
   // Color
   const color1Input = document.getElementById('input-color-1');
-  color1Input.value = SETTINGS.color.join(' ');
+  color1Input.value = SETTINGS.defaultColor.join(' ');
   color1Input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
       const colorArray = e.target.value.split(' ').map((str) => Number.parseFloat(str));
-      SETTINGS.color = colorArray;
+      SETTINGS.defaultColor = colorArray;
 
       // Update and push the color buffer
       for (let i = 0; i < colors.length; i++) {
@@ -439,6 +437,16 @@ void main() {
     if (e.key === 'Enter') {
       SETTINGS.playSpeed = Number.parseFloat(e.target.value);
     }
+  });
+
+  // Show/Hide Controls
+  const showControlsBtn = document.getElementById('btn-show-controls');
+  showControlsBtn.addEventListener('click', () => {
+    document.body.classList.add('showing-controls');
+  });
+  const hideControlsBtn = document.getElementById('btn-hide-controls');
+  hideControlsBtn.addEventListener('click', () => {
+    document.body.classList.remove('showing-controls');
   });
 
   function pixelsToClip(x, y) {
@@ -464,3 +472,12 @@ function getRandomNumber(min, max, round = true) {
   const result = Math.random() * (max - min) + min;
   return round ? Math.round(result) : result;
 }
+
+console.log(
+  '%cHello there! Welcome to Physarum.',
+  'font-size: 24px; background-color: #222; color: #6688cc'
+);
+console.log(
+  '%cCreated by Stephen Haney in January 2022',
+  'background-color: #222; color: #fff;'
+);
